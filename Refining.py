@@ -12,6 +12,12 @@ from tkinter import filedialog
 import threading
 from PIL import ImageTk,Image
 import swifter
+import time
+
+start_time = time.time()
+#main()
+
+
 
 window = Tk()
 window.title("B-Vac")
@@ -26,6 +32,7 @@ SAVE_BUTTON = ImageTk.PhotoImage(Image.open("./Images/Logo/Save_Button.png"))
 BROWSE_BUTTON = ImageTk.PhotoImage(Image.open("./Images/Logo/Browse_Button.png"))
 SUBMIT_BUTTON = ImageTk.PhotoImage(Image.open("./Images/Logo/SUBMIT.png"))
 IBG_LAB_LOGO = ImageTk.PhotoImage(Image.open("./Images/New IBG Logo.png"))
+MGBio_LOGO = ImageTk.PhotoImage(Image.open("./Images/MGBio.png"))
 
 aligner = Align.PairwiseAligner()
 
@@ -39,20 +46,23 @@ Submission_method_frame = Frame(window, width=width_frames, height=300, bg=First
 Submission_method_frame.grid(row=0,sticky="w")
 
 IBG_LOGO = Label(Submission_method_frame, image=IBG_LAB_LOGO, bg=Second_Color)
-IBG_LOGO.place(relx=0.816, rely=0.07)
+IBG_LOGO.place(relx=0.855, rely=0.09)
+
+MGBio_LOGO_Label = Label(Submission_method_frame, image=MGBio_LOGO, bg=Second_Color)
+MGBio_LOGO_Label.place(relx=0.79, rely=0.1)
 
 Job_Status = Label(Submission_method_frame, text="Job Status: Not Running",bg=First_Color, font=(font_family,(15)), fg=Buttons_Colors)
 Job_Status.place(relx=0.39, rely=0.88)
 
-Logo_Label_Image = ImageTk.PhotoImage(Image.open("./Images/Logo/Logo.png").resize((160,50)))
+Logo_Label_Image = ImageTk.PhotoImage(Image.open("./Images/Logo/Logo_Final.png").resize((160,50)))
 Logo_Label = Label(Submission_method_frame, image=Logo_Label_Image, bg=First_Color)
 Logo_Label.place(relx=0.022, rely=0.07)
 
 Description_Label = Label(Submission_method_frame, text="A Robust Software Package for Bacterial Vaccine Design", bg=First_Color, font=(font_family,(16)), fg=Buttons_Colors)
 Description_Label.place(relx=0.25, rely=0.16)
 
-Submission_label = Label(Submission_method_frame, text="Choose a Submission Method", bg=First_Color, font=(font_family,(14)), fg=Buttons_Colors)
-Submission_label.place(relx=0.022, rely=0.27)
+Submission_label = Label(Submission_method_frame, text="Choose a Submission Method", bg=First_Color, font=(font_family,(10)), fg=Buttons_Colors)
+Submission_label.place(relx=0.022, rely=0.3)
 
 
 def all_equal(items):
@@ -165,7 +175,6 @@ SAVE_FILE_Var = StringVar()
 def SAVE_FILE():
     folder_selected = filedialog.askdirectory()
     SAVE_FILE_Var.set(folder_selected)
-    print(folder_selected)
 
 
 def Update_Progress(value):
@@ -195,12 +204,12 @@ def FASTA_SUBMIT_BTN():
             "FASTA": all_fastas
         })
 
-        FASTA_BROWSE_LABEL.config(text="Select A File")
+        FASTA_BROWSE_LABEL.config(text="Select File")
 
     elif len(input) != 0 and filename_var.get() != "":
         messagebox.showwarning("Warning", "Choose One Submission Method")
         filename_var.set("")
-        FASTA_BROWSE_LABEL.config(text="Select A File")
+        FASTA_BROWSE_LABEL.config(text="Select File")
 
     else:
         Amino_acid_list = ["A", "R", "N", "D", "C", "Q", "E", "G", "H", "I", "L", "K", "M", "F", "P", "S", "T", "W", "Y",
@@ -319,28 +328,34 @@ def FASTA_SUBMIT_BTN():
                         FINAL_LOC = pd.concat(LIST_LOC)
 
                         if Localization_identity_var.get() != 0:
-                            FASTA_INCLUDED = FINAL_LOC[FINAL_LOC['PERCENTAGE'] >= Localization_identity_var.get()].reset_index(drop=True)
+                            FASTA_INCLUDED = FINAL_LOC[FINAL_LOC['PERCENTAGE'] >= Localization_identity_var.get()].reset_index(drop=True).drop('FASTA_UNIPROT', axis=1).drop_duplicates()
+
+                            SUBCELLULAR_LOCALIZATION = pd.DataFrame({
+                                "FASTA ID" : FASTA_INCLUDED["FASTA ID"],
+                                "LOC" : FASTA_INCLUDED["LOC"],
+                                "PERCENTAGE" : FASTA_INCLUDED["PERCENTAGE"],
+                                "FASTA_SUBMITTED" : FASTA_INCLUDED["FASTA_SUBMITTED"]
+                            }).drop_duplicates().reset_index(drop=True)
 
                             if len(FASTA_INCLUDED) == 0:
                                 messagebox.showerror("Error", "No Relevant Data found")
                             else:
                                 with open(f"{SAVE_FILE_Var.get()}/FIRST_LOCALIZATION.faa", "w") as faa_file:
                                     for FAA_PROTEIN, FAA_LOCATION, FAA_ID, FAA_PERC in zip(
-                                            FASTA_INCLUDED['FASTA_SUBMITTED'],
-                                            FASTA_INCLUDED['LOC'],
-                                            FASTA_INCLUDED['FASTA ID'],
-                                            FASTA_INCLUDED['PERCENTAGE']):
+                                            SUBCELLULAR_LOCALIZATION['FASTA_SUBMITTED'],
+                                            SUBCELLULAR_LOCALIZATION['LOC'],
+                                            SUBCELLULAR_LOCALIZATION['FASTA ID'],
+                                            SUBCELLULAR_LOCALIZATION['PERCENTAGE']):
                                         faa_file.write(
                                             f">{FAA_ID} {FAA_LOCATION} {FAA_PERC}%" + "\n" + str(FAA_PROTEIN) + "\n")
                                     faa_file.close()
                                 Localization_Proteins.config(
-                                    text=f"{len(FASTA_INCLUDED.drop_duplicates())}\nProtein(s)",
+                                    text=f"{len(SUBCELLULAR_LOCALIZATION)}\nProtein(s)",
                                     fg="Red")
                                 # messagebox.showinfo("Completed", "Localizaton Completed")
                                 sleep(2)
 
                 if Non_Homologs_var.get() == "True":
-                    print(True)
 
                     HUMAN_TITLE, HUMAN_FASTA, HUMAN_DES = read_submitted_fasta_file("./Data/Human_Reference_Genome.fasta")
 
@@ -373,17 +388,23 @@ def FASTA_SUBMIT_BTN():
                                             COUNTED_VAL_SEQ.append(COUNTED_NAMES[0])
                                             COUNTED_VAL_ID.append(COUNTED_NAMES[1])
 
+                    HOMOLOGS_DATA = pd.DataFrame({
+                        "TITLE": COUNTED_VAL_ID,
+                        "FASTA": COUNTED_VAL_SEQ,
+                        "DES": COUNTED_VAL_LIST
+                    }).drop_duplicates().reset_index(drop=True)
+
                     if len(FINAL_DATA) == 0:
                         messagebox.showerror("Error", "No Relevant Data found")
                     else:
                         with open(f"{SAVE_FILE_Var.get()}//NON_HOMOLOGS.faa", "w") as faa_file:
-                            for FAA_PROTEIN, FAA_ID, FAA_PERC in zip(COUNTED_VAL_SEQ, COUNTED_VAL_ID,
-                                                                     COUNTED_VAL_LIST):
+                            for FAA_ID,FAA_PROTEIN, FAA_PERC in zip(HOMOLOGS_DATA["TITLE"], HOMOLOGS_DATA["FASTA"],
+                                                                     HOMOLOGS_DATA["DES"]):
                                 faa_file.write(
                                     f">{FAA_ID} {FAA_PERC} NON HOMOLOGY" + "\n" + str(FAA_PROTEIN) + "\n")
                             faa_file.close()
 
-                        Non_Homologs_Proteins.config(text=f"{len(COUNTED_VAL_LIST)}\nProtein(s)", fg="Red")
+                        Non_Homologs_Proteins.config(text=f"{len(HOMOLOGS_DATA)}\nProtein(s)", fg="Red")
                         sleep(2)
 
                 if VFDB_var.get() == "True":
@@ -418,18 +439,24 @@ def FASTA_SUBMIT_BTN():
 
                     FINAL_VFDB = FINAL_LOC[FINAL_LOC["PERCENTAGE"] >= VFDB_identity_var.get()].reset_index(drop=True)
 
+                    VFDB_DATAFRAME = pd.DataFrame({
+                        "SUBMITTED_SEQUENCE" : FINAL_VFDB["SUBMITTED_SEQUENCE"],
+                        "SUBMITTED ID" : FINAL_VFDB["SUBMITTED ID"],
+                        "PERCENTAGE" : FINAL_VFDB["PERCENTAGE"]
+                    }).drop_duplicates().reset_index(drop=True)
+
                     if len(DATA_FRAME) == 0:
                         messagebox.showerror("Error", "No Relevant Data found")
                     else:
                         with open(f"{SAVE_FILE_Var.get()}//VFDB.faa", "w") as faa_file:
                             for FAA_PROTEIN, FAA_ID, FAA_PERC in zip(
-                                    FINAL_VFDB['SUBMITTED_SEQUENCE'],
-                                    FINAL_VFDB['SUBMITTED ID'],
-                                    FINAL_VFDB['PERCENTAGE']):
+                                    VFDB_DATAFRAME['SUBMITTED_SEQUENCE'],
+                                    VFDB_DATAFRAME['SUBMITTED ID'],
+                                    VFDB_DATAFRAME['PERCENTAGE']):
                                 faa_file.write(f">{FAA_ID} {FAA_PERC}% Virulence" + "\n" + str(FAA_PROTEIN) + "\n")
                             faa_file.close()
                         VFDB_Proteins.config(
-                            text=f"{len(FINAL_VFDB.drop_duplicates())}\nProtein(s)",
+                            text=f"{len(VFDB_DATAFRAME.drop_duplicates())}\nProtein(s)",
                             fg="Red")
                         sleep(2)
 
@@ -448,8 +475,20 @@ def FASTA_SUBMIT_BTN():
                     CD8_EPITOPES = []
                     CD4_EPITOPES = []
 
-                    CD8_WINDOW_LENGTH = Epitope_window_CD8_var.get()
-                    CD4_WINDOW_LENGTH = Epitope_window_CD4_var.get()
+                    if Epitope_window_B_cell_var.get() == "ALL":
+                        WINDOW_LENGTH = [12, 13, 14, 15, 16, 17, 18, 19, 20]
+                    else:
+                        WINDOW_LENGTH = [int(Epitope_window_B_cell_var.get())]
+
+                    if Epitope_window_CD4_var.get() == "ALL":
+                        CD4_WINDOW_LENGTH = [13, 14, 15, 16, 17, 18, 19, 20]
+                    else:
+                        CD4_WINDOW_LENGTH = [int(Epitope_window_CD4_var.get())]
+
+                    if Epitope_window_CD8_var.get() == "ALL":
+                        CD8_WINDOW_LENGTH = [8, 9, 10, 11, 12, 13]
+                    else:
+                        CD8_WINDOW_LENGTH = [int(Epitope_window_CD8_var.get())]
 
                     for single in data_list:
                         VIRULENCE_DATA_FRAME = pd.DataFrame({
@@ -457,27 +496,36 @@ def FASTA_SUBMIT_BTN():
                             "FASTA": single["FASTA"],
                         }).drop_duplicates()
 
-                        WINDOW_LENGTH = Epitope_window_B_cell_var.get()
-
                         for VFDB_FASTA, IDs_B_CELL in zip(VIRULENCE_DATA_FRAME["FASTA"], VIRULENCE_DATA_FRAME["ID"]):
-                            FASTA_CHUNKS = [VFDB_FASTA[i: j] for i in range(len(VFDB_FASTA)) for j in
-                                            range(i + 1, len(VFDB_FASTA) + 1) if
-                                            len(VFDB_FASTA[i:j]) == WINDOW_LENGTH]
-                            for SINGLE_CHUNK in FASTA_CHUNKS:
-                                FILTERED_LEN = EPI_DATA_FRAME[
-                                    EPI_DATA_FRAME["EPI"].apply(len) == WINDOW_LENGTH].reset_index(drop=True)
-                                FILTERED_LEN["VIRULENCE CHUNK"] = SINGLE_CHUNK
-                                FILTERED_LEN["ID"] = IDs_B_CELL
-                                ALL_EPITOPES_B_CELL.append(FILTERED_LEN)
+                            for WINDOW_LENGTHs in WINDOW_LENGTH:
+                                FASTA_CHUNKS = [VFDB_FASTA[i: j] for i in range(len(VFDB_FASTA)) for j in
+                                                range(i + 1, len(VFDB_FASTA) + 1) if
+                                                len(VFDB_FASTA[i:j]) == WINDOW_LENGTHs]
+                                for SINGLE_CHUNK in FASTA_CHUNKS:
+                                    FILTERED_LEN = EPI_DATA_FRAME[
+                                        EPI_DATA_FRAME["EPI"].apply(len) == WINDOW_LENGTHs].reset_index(drop=True)
+                                    FILTERED_LEN["VIRULENCE CHUNK"] = SINGLE_CHUNK
+                                    FILTERED_LEN["ID"] = IDs_B_CELL
+                                    FILTERED_LEN["TYPE"] = "B CELL"
+                                    FILTERED_LEN["RESULT"] = FILTERED_LEN.apply(
+                                        lambda x: compute_matched([x["EPI"], x["VIRULENCE CHUNK"]]), axis=1)
+                                    B_CELL_RESULT = FILTERED_LEN[FILTERED_LEN["RESULT"] >= Epitope_identity_B_cell_var.get()]
+                                    ALL_EPITOPES_B_CELL.append(B_CELL_RESULT)
 
-                        for B_CELL_EPITOPE, IDs_T_CELL in zip(VIRULENCE_DATA_FRAME["FASTA"], VIRULENCE_DATA_FRAME["ID"]):
+                    CONCAT_B_CELL = pd.concat(ALL_EPITOPES_B_CELL).reset_index(drop=True)
+
+                    for B_CELL_EPITOPE, IDs_T_CELL in zip(VIRULENCE_DATA_FRAME["FASTA"],
+                                                          VIRULENCE_DATA_FRAME["ID"]):
+
+                        for CD8_WINDOW_LENGTHs in CD8_WINDOW_LENGTH:
                             FASTA_CHUNKS_CD8 = [B_CELL_EPITOPE[i: j] for i in range(len(B_CELL_EPITOPE)) for j in
                                                 range(i + 1, len(B_CELL_EPITOPE) + 1) if
-                                                len(B_CELL_EPITOPE[i:j]) == CD8_WINDOW_LENGTH]
+                                                len(B_CELL_EPITOPE[i:j]) == CD8_WINDOW_LENGTHs]
 
+                        for CD4_WINDOW_LENGTHs in CD4_WINDOW_LENGTH:
                             FASTA_CHUNKS_CD4 = [B_CELL_EPITOPE[i: j] for i in range(len(B_CELL_EPITOPE)) for j in
                                                 range(i + 1, len(B_CELL_EPITOPE) + 1) if
-                                                len(B_CELL_EPITOPE[i:j]) == CD4_WINDOW_LENGTH]
+                                                len(B_CELL_EPITOPE[i:j]) == CD4_WINDOW_LENGTHs]
 
                             for SINGLE_CHUNK_CD8 in FASTA_CHUNKS_CD8:
                                 CD8_DATA_FRAME["ID"] = IDs_T_CELL
@@ -485,9 +533,12 @@ def FASTA_SUBMIT_BTN():
                                 CD8_DATA_FRAME["ALLEL"] = CD8["ALLEL"]
                                 CD8_DATA_FRAME["EPI"] = CD8["FASTA"]
                                 FILTERED_LEN_CD8 = CD8_DATA_FRAME[
-                                    CD8_DATA_FRAME["EPI"].apply(len) == CD8_WINDOW_LENGTH].reset_index(drop=True)
+                                    CD8_DATA_FRAME["EPI"].apply(len) == CD8_WINDOW_LENGTHs].reset_index(drop=True)
                                 CD8_DATA_FRAME["VIRULENCE CHUNK"] = SINGLE_CHUNK_CD8
-                                CD8_EPITOPES.append(FILTERED_LEN_CD8)
+                                CD8_DATA_FRAME["RESULT"] = CD8_DATA_FRAME.apply(
+                                    lambda x: compute_matched([x["EPI"], x["VIRULENCE CHUNK"]]), axis=1)
+                                CD8_RESULT = CD8_DATA_FRAME[CD8_DATA_FRAME["RESULT"] >= Epitope_identity_CD8_var.get()]
+                                CD8_EPITOPES.append(CD8_RESULT)
 
                             for SINGLE_CHUNK_CD4 in FASTA_CHUNKS_CD4:
                                 CD4_DATA_FRAME["ID"] = IDs_T_CELL
@@ -495,50 +546,55 @@ def FASTA_SUBMIT_BTN():
                                 CD4_DATA_FRAME["ALLEL"] = CD4["ALLEL"]
                                 CD4_DATA_FRAME["EPI"] = CD4["FASTA"]
                                 FILTERED_LEN_CD4 = CD4_DATA_FRAME[
-                                    CD4_DATA_FRAME["EPI"].apply(len) == CD4_WINDOW_LENGTH].reset_index(drop=True)
+                                    CD4_DATA_FRAME["EPI"].apply(len) == CD4_WINDOW_LENGTHs].reset_index(drop=True)
                                 CD4_DATA_FRAME["VIRULENCE CHUNK"] = SINGLE_CHUNK_CD4
-                                CD4_EPITOPES.append(FILTERED_LEN_CD4)
-
-                    EPITOPES_DATA_FRAME = pd.concat(ALL_EPITOPES_B_CELL).reset_index(drop=True)
-                    EPITOPES_DATA_FRAME["TYPE"] = "B CELL"
-                    EPITOPES_DATA_FRAME["RESULT"] = EPITOPES_DATA_FRAME.apply(
-                        lambda x: compute_matched([x["EPI"], x["VIRULENCE CHUNK"]]), axis=1)
+                                CD4_DATA_FRAME["RESULT"] = CD4_DATA_FRAME.apply(
+                                    lambda x: compute_matched([x["EPI"], x["VIRULENCE CHUNK"]]), axis=1)
+                                CD4_RESULT = CD4_DATA_FRAME[CD4_DATA_FRAME["RESULT"] >= Epitope_identity_CD4_var.get()]
+                                CD4_EPITOPES.append(CD4_RESULT)
 
                     CD8_EPITOPES_DATAFRAME = pd.concat(CD8_EPITOPES).reset_index(drop=True).dropna()
-                    CD8_EPITOPES_DATAFRAME["RESULT"] = CD8_EPITOPES_DATAFRAME.apply(
-                        lambda x: compute_matched([x["EPI"], x["VIRULENCE CHUNK"]]), axis=1)
-
                     CD4_EPITOPES_DATAFRAME = pd.concat(CD4_EPITOPES).reset_index(drop=True).dropna()
-                    CD4_EPITOPES_DATAFRAME["RESULT"] = CD4_EPITOPES_DATAFRAME.apply(
-                        lambda x: compute_matched([x["EPI"], x["VIRULENCE CHUNK"]]), axis=1)
 
-                    RESULT_CD8 = CD8_EPITOPES_DATAFRAME[CD8_EPITOPES_DATAFRAME["RESULT"] >= Epitope_identity_CD8_var.get()]
-                    RESULT_CD4 = CD4_EPITOPES_DATAFRAME[CD4_EPITOPES_DATAFRAME["RESULT"] >= Epitope_identity_CD4_var.get()]
+                    T_CELL_FILTERED = pd.concat([CD8_EPITOPES_DATAFRAME, CD4_EPITOPES_DATAFRAME])
 
-                    T_CELL_FILTERED = pd.concat([RESULT_CD8, RESULT_CD4])
-                    B_CELL_FILTERED = EPITOPES_DATA_FRAME[EPITOPES_DATA_FRAME["RESULT"] >= Epitope_identity_B_cell_var.get()].reset_index(
-                        drop=True)
+                    T_CELL_DATAFRAME = pd.DataFrame({
+                        "EPI" : T_CELL_FILTERED["EPI"],
+                        "ID" : T_CELL_FILTERED["ID"],
+                        "RESULT" : T_CELL_FILTERED["RESULT"],
+                        "TYPE" : T_CELL_FILTERED["TYPE"],
+                        "ALLEL" : T_CELL_FILTERED["ALLEL"]
+                    }).drop_duplicates().reset_index(drop=True)
+
+                    B_CELL_DATAFRAME = pd.DataFrame({
+                        "EPI" : CONCAT_B_CELL["EPI"],
+                        "ID" : CONCAT_B_CELL["ID"],
+                        "RESULT" : CONCAT_B_CELL["RESULT"],
+                        "TYPE" : CONCAT_B_CELL["TYPE"]
+                    }).drop_duplicates().reset_index(drop=True)
 
                     with open(f"{SAVE_FILE_Var.get()}//T_EPITOPES.faa", "w") as faa_file_first:
-                            for FAA_PROTEIN, FAA_ID, FAA_PERC, FAA_NAME, FAA_TITLE in zip(
-                                    T_CELL_FILTERED['EPI'],
-                                    T_CELL_FILTERED['ID'],
-                                    T_CELL_FILTERED['RESULT'],
-                                    T_CELL_FILTERED['TYPE'],
-                                    T_CELL_FILTERED["ALLEL"]):
-                                faa_file_first.write(f">{FAA_ID} {int(FAA_PERC)}% {FAA_NAME} {FAA_TITLE}" + "\n" + str(FAA_PROTEIN) + "\n")
-                            faa_file_first.close()
+                        for FAA_PROTEIN, FAA_ID, FAA_PERC, FAA_NAME, FAA_TITLE in zip(
+                                T_CELL_DATAFRAME['EPI'],
+                                T_CELL_DATAFRAME['ID'],
+                                T_CELL_DATAFRAME['RESULT'],
+                                T_CELL_DATAFRAME['TYPE'],
+                                T_CELL_DATAFRAME["ALLEL"]):
+                            faa_file_first.write(
+                                f">{FAA_ID} {int(FAA_PERC)}% {FAA_NAME} {FAA_TITLE}" + "\n" + str(FAA_PROTEIN) + "\n")
+                        faa_file_first.close()
 
                     with open(f"{SAVE_FILE_Var.get()}//B_EPITOPES.faa", "w") as faa_file_second:
-                            for FAA_PROTEIN, FAA_ID, FAA_PERC, FAA_NAME in zip(
-                                    B_CELL_FILTERED['EPI'],
-                                    B_CELL_FILTERED['ID'],
-                                    B_CELL_FILTERED['RESULT'],
-                                    B_CELL_FILTERED['TYPE']):
-                                faa_file_second.write(f">{FAA_ID} {int(FAA_PERC)}% {FAA_NAME} {FAA_TITLE}" + "\n" + str(FAA_PROTEIN) + "\n")
-                            faa_file_second.close()
+                        for FAA_PROTEIN, FAA_ID, FAA_PERC, FAA_NAME in zip(
+                                B_CELL_DATAFRAME['EPI'],
+                                B_CELL_DATAFRAME['ID'],
+                                B_CELL_DATAFRAME['RESULT'],
+                                B_CELL_DATAFRAME['TYPE']):
+                            faa_file_second.write(
+                                f">{FAA_ID} {int(FAA_PERC)}% {FAA_NAME} {FAA_TITLE}" + "\n" + str(FAA_PROTEIN) + "\n")
+                        faa_file_second.close()
 
-                    TOTAL_EPI = len(T_CELL_FILTERED) + len(B_CELL_FILTERED)
+                    TOTAL_EPI = len(T_CELL_DATAFRAME) + len(B_CELL_DATAFRAME)
 
                     Epitope_peptides.config(text=f"{TOTAL_EPI}\nEpitope(s)", fg="Red")
                     sleep(2)
@@ -568,6 +624,8 @@ def FASTA_SUBMIT_BTN():
             if SAVE_FILE_Var.get() != "":
 
                 try:
+
+                    Update_Progress(5)
 
                     LOCATION_LIST = []
                     BIT_SCORE_LIST = []
@@ -614,7 +672,7 @@ def FASTA_SUBMIT_BTN():
                                 FILTERED_LENGTH = DATA_FINAL_LOC[
                                     DATA_FINAL_LOC["LEN_SUBMITTED"] <= DATA_FINAL_LOC["LEN_UNIPROT"]].reset_index(drop=True)
                                 try:
-                                    FILTERED_LENGTH['PERCENTAGE'] = FILTERED_LENGTH.apply(
+                                    FILTERED_LENGTH['PERCENTAGE'] = FILTERED_LENGTH.swifter.apply(
                                         lambda x: compute_matched([x["FASTA_UNIPROT"], x['FASTA_SUBMITTED']]), axis=1)
                                     FINAL = FILTERED_LENGTH[
                                         FILTERED_LENGTH['PERCENTAGE'] == FILTERED_LENGTH['PERCENTAGE'].max()]
@@ -629,20 +687,27 @@ def FASTA_SUBMIT_BTN():
                             FASTA_INCLUDED = FINAL_LOC[
                                 FINAL_LOC['PERCENTAGE'] >= Localization_identity_var.get()].reset_index(drop=True)
 
+                            SUBCELLULAR_LOCALIZATION = pd.DataFrame({
+                                "FASTA ID" : FASTA_INCLUDED["FASTA ID"],
+                                "LOC" : FASTA_INCLUDED["LOC"],
+                                "PERCENTAGE" : FASTA_INCLUDED["PERCENTAGE"],
+                                "FASTA_SUBMITTED" : FASTA_INCLUDED["FASTA_SUBMITTED"]
+                            }).drop_duplicates().reset_index(drop=True)
+
                             if len(FASTA_INCLUDED) == 0:
                                 messagebox.showerror("Error", "No Relevant Data found")
                             else:
-                                with open(f"{SAVE_FILE_Var.get()}/FIRST_LOCALIZATION.faa", "w") as faa_file:
+                                with open(f"{SAVE_FILE_Var.get()}/FIRST_LOCALIZATION_{len(SUBCELLULAR_LOCALIZATION)}.faa", "w") as faa_file:
                                     for FAA_PROTEIN, FAA_LOCATION, FAA_ID, FAA_PERC in zip(
-                                            FASTA_INCLUDED['FASTA_SUBMITTED'],
-                                            FASTA_INCLUDED['LOC'],
-                                            FASTA_INCLUDED['FASTA ID'],
-                                            FASTA_INCLUDED['PERCENTAGE']):
+                                            SUBCELLULAR_LOCALIZATION['FASTA_SUBMITTED'],
+                                            SUBCELLULAR_LOCALIZATION['LOC'],
+                                            SUBCELLULAR_LOCALIZATION['FASTA ID'],
+                                            SUBCELLULAR_LOCALIZATION['PERCENTAGE']):
                                         faa_file.write(
                                             f">{FAA_ID} {FAA_LOCATION} {FAA_PERC}%" + "\n" + str(FAA_PROTEIN) + "\n")
                                     faa_file.close()
                                 Localization_Proteins.config(
-                                    text=f"{len(FASTA_INCLUDED.drop_duplicates())}\nProtein(s)",
+                                    text=f"{len(SUBCELLULAR_LOCALIZATION)}\nProtein(s)",
                                     fg="Red")
                                 # messagebox.showinfo("Completed", "Localizaton Completed")
                                 sleep(2)
@@ -684,18 +749,23 @@ def FASTA_SUBMIT_BTN():
                                         COUNTED_VAL_SEQ.append(COUNTED_NAMES[0])
                                         COUNTED_VAL_ID.append(COUNTED_NAMES[1])
 
+                    HOMOLOGS_DATA = pd.DataFrame({
+                        "TITLE": COUNTED_VAL_ID,
+                        "FASTA": COUNTED_VAL_SEQ,
+                        "DES": COUNTED_VAL_LIST
+                    }).drop_duplicates().reset_index(drop=True)
+
                     if len(FINAL_DATA) == 0:
                         messagebox.showerror("Error", "No Relevant Data found")
                     else:
-                        with open(f"{SAVE_FILE_Var.get()}//NON_HOMOLOGS.faa", "w") as faa_file:
-                            for FAA_PROTEIN, FAA_ID, FAA_PERC in zip(COUNTED_VAL_SEQ, COUNTED_VAL_ID, COUNTED_VAL_LIST):
-                                faa_file.write(f">{FAA_ID} {FAA_PERC} NON HOMOLOGY" + "\n" + str(FAA_PROTEIN) + "\n")
+                        with open(f"{SAVE_FILE_Var.get()}//NON_HOMOLOGS_{len(HOMOLOGS_DATA)}.faa", "w") as faa_file:
+                            for FAA_ID,FAA_PROTEIN, FAA_PERC in zip(HOMOLOGS_DATA["TITLE"], HOMOLOGS_DATA["FASTA"],
+                                                                     HOMOLOGS_DATA["DES"]):
+                                faa_file.write(
+                                    f">{FAA_ID} {FAA_PERC} NON HOMOLOGY" + "\n" + str(FAA_PROTEIN) + "\n")
                             faa_file.close()
 
-                    #Non_Homologs_Proteins.config(text=f"0\nProtein(s)", fg=Label_Color)
-
-                    Non_Homologs_Proteins.config(text=f"{len(COUNTED_VAL_LIST)}\nProtein(s)", fg="Red")
-
+                    Non_Homologs_Proteins.config(text=f"{len(HOMOLOGS_DATA)}\nProtein(s)", fg="Red")
                     sleep(2)
 
                     Update_Progress(50)
@@ -729,19 +799,39 @@ def FASTA_SUBMIT_BTN():
 
                     FINAL_VFDB = FINAL_VIRULENCE[FINAL_VIRULENCE["PERCENTAGE"] >= VFDB_identity_var.get()].reset_index(drop=True)
 
+                    VFDB_DATAFRAME = pd.DataFrame({
+                        "SUBMITTED_SEQUENCE": FINAL_VFDB["SUBMITTED_SEQUENCE"],
+                        "SUBMITTED ID": FINAL_VFDB["SUBMITTED ID"],
+                        "PERCENTAGE": FINAL_VFDB["PERCENTAGE"]
+                    }).drop_duplicates().reset_index(drop=True)
+
                     if len(DATA_FRAME) == 0:
                         messagebox.showerror("Error", "No Relevant Data found")
                     else:
-                        with open(f"{SAVE_FILE_Var.get()}//VFDB.faa", "w") as faa_file:
+                        with open(f"{SAVE_FILE_Var.get()}//VFDB_{len(VFDB_DATAFRAME)}.faa", "w") as faa_file:
                             for FAA_PROTEIN, FAA_ID, FAA_PERC in zip(
-                                    FINAL_VFDB['SUBMITTED_SEQUENCE'],
-                                    FINAL_VFDB['SUBMITTED ID'],
-                                    FINAL_VFDB['PERCENTAGE']):
+                                    VFDB_DATAFRAME['SUBMITTED_SEQUENCE'],
+                                    VFDB_DATAFRAME['SUBMITTED ID'],
+                                    VFDB_DATAFRAME['PERCENTAGE']):
                                 faa_file.write(f">{FAA_ID} {FAA_PERC}% Virulence" + "\n" + str(FAA_PROTEIN) + "\n")
                             faa_file.close()
+
+                        with open(f"{SAVE_FILE_Var.get()}//PVCs_{len(VFDB_DATAFRAME)}.faa", "w") as faa_file:
+                            for FAA_PROTEIN, FAA_ID, FAA_PERC in zip(
+                                    VFDB_DATAFRAME['SUBMITTED_SEQUENCE'],
+                                    VFDB_DATAFRAME['SUBMITTED ID'],
+                                    VFDB_DATAFRAME['PERCENTAGE']):
+                                faa_file.write(f">{FAA_ID} {FAA_PERC}% Virulence" + "\n" + str(FAA_PROTEIN) + "\n")
+                            faa_file.close()
+
                         VFDB_Proteins.config(
-                            text=f"{len(FINAL_VFDB.drop_duplicates())}\nProtein(s)",
+                            text=f"{len(VFDB_DATAFRAME.drop_duplicates())}\nProtein(s)",
                             fg="Red")
+
+                        PVCs.config(
+                            text=f"{len(VFDB_DATAFRAME.drop_duplicates())}\nPVC(s)",
+                            fg="Green")
+
                         sleep(2)
 
                     Update_Progress(75)
@@ -759,100 +849,125 @@ def FASTA_SUBMIT_BTN():
                     CD8_EPITOPES = []
                     CD4_EPITOPES = []
 
-                    CD8_WINDOW_LENGTH = Epitope_window_CD8_var.get()
-                    CD4_WINDOW_LENGTH = Epitope_window_CD4_var.get()
-
                     VIRULENCE_DATA_FRAME = pd.DataFrame({
                         "ID": FINAL_VFDB['SUBMITTED ID'],
                         "FASTA": FINAL_VFDB['SUBMITTED_SEQUENCE'],
                     }).drop_duplicates()
 
-                    WINDOW_LENGTH = Epitope_window_B_cell_var.get()
+                    if Epitope_window_B_cell_var.get() == "ALL":
+                        WINDOW_LENGTH = [12, 13, 14, 15, 16, 17, 18, 19, 20]
+                    else:
+                        WINDOW_LENGTH = [int(Epitope_window_B_cell_var.get())]
 
-                    for VFDB_FASTA, IDs_B_CELL in zip(VIRULENCE_DATA_FRAME["FASTA"], VIRULENCE_DATA_FRAME["ID"]):
-                        FASTA_CHUNKS = [VFDB_FASTA[i: j] for i in range(len(VFDB_FASTA)) for j in
-                                        range(i + 1, len(VFDB_FASTA) + 1) if
-                                        len(VFDB_FASTA[i:j]) == WINDOW_LENGTH]
+                    if Epitope_window_CD4_var.get() == "ALL":
+                        CD4_WINDOW_LENGTH = [13, 14, 15, 16, 17, 18, 19, 20]
+                    else:
+                        CD4_WINDOW_LENGTH = [int(Epitope_window_CD4_var.get())]
+
+                    if Epitope_window_CD8_var.get() == "ALL":
+                        CD8_WINDOW_LENGTH = [8, 9, 10, 11, 12, 13]
+                    else:
+                        CD8_WINDOW_LENGTH = [int(Epitope_window_CD8_var.get())]
+
+                    for WINDOW_LENGTHs in WINDOW_LENGTH:
+                        for VFDB_FASTA, IDs_B_CELL in zip(VIRULENCE_DATA_FRAME["FASTA"], VIRULENCE_DATA_FRAME["ID"]):
+                            FASTA_CHUNKS = [VFDB_FASTA[i: j] for i in range(len(VFDB_FASTA)) for j in
+                                            range(i + 1, len(VFDB_FASTA) + 1) if
+                                            len(VFDB_FASTA[i:j]) == WINDOW_LENGTHs]
                         for SINGLE_CHUNK in FASTA_CHUNKS:
                             FILTERED_LEN = EPI_DATA_FRAME[
-                                EPI_DATA_FRAME["EPI"].apply(len) == WINDOW_LENGTH].reset_index(drop=True)
+                                EPI_DATA_FRAME["EPI"].apply(len) == WINDOW_LENGTHs].reset_index(drop=True)
                             FILTERED_LEN["VIRULENCE CHUNK"] = SINGLE_CHUNK
                             FILTERED_LEN["ID"] = IDs_B_CELL
-                            ALL_EPITOPES_B_CELL.append(FILTERED_LEN)
+                            FILTERED_LEN["TYPE"] = "B CELL"
+                            FILTERED_LEN["RESULT"] = FILTERED_LEN.apply(
+                                lambda x: compute_matched([x["EPI"], x["VIRULENCE CHUNK"]]), axis=1)
+                            B_CELL_RESULT = FILTERED_LEN[FILTERED_LEN["RESULT"] >= Epitope_identity_B_cell_var.get()]
+                            ALL_EPITOPES_B_CELL.append(B_CELL_RESULT)
+
+                        CONCAT_B_CELL = pd.concat(ALL_EPITOPES_B_CELL).reset_index(drop=True)
 
                     for B_CELL_EPITOPE, IDs_T_CELL in zip(VIRULENCE_DATA_FRAME["FASTA"],
                                                           VIRULENCE_DATA_FRAME["ID"]):
-                        FASTA_CHUNKS_CD8 = [B_CELL_EPITOPE[i: j] for i in range(len(B_CELL_EPITOPE)) for j in
-                                            range(i + 1, len(B_CELL_EPITOPE) + 1) if
-                                            len(B_CELL_EPITOPE[i:j]) == CD8_WINDOW_LENGTH]
 
-                        FASTA_CHUNKS_CD4 = [B_CELL_EPITOPE[i: j] for i in range(len(B_CELL_EPITOPE)) for j in
-                                            range(i + 1, len(B_CELL_EPITOPE) + 1) if
-                                            len(B_CELL_EPITOPE[i:j]) == CD4_WINDOW_LENGTH]
+                        for CD8_WINDOW_LENGTHs in CD8_WINDOW_LENGTH:
+                            FASTA_CHUNKS_CD8 = [B_CELL_EPITOPE[i: j] for i in range(len(B_CELL_EPITOPE)) for j in
+                                                range(i + 1, len(B_CELL_EPITOPE) + 1) if
+                                                len(B_CELL_EPITOPE[i:j]) == CD8_WINDOW_LENGTHs]
 
-                        for SINGLE_CHUNK_CD8 in FASTA_CHUNKS_CD8:
-                            CD8_DATA_FRAME["ID"] = IDs_T_CELL
-                            CD8_DATA_FRAME["TYPE"] = "CD8"
-                            CD8_DATA_FRAME["ALLEL"] = CD8["ALLEL"]
-                            CD8_DATA_FRAME["EPI"] = CD8["FASTA"]
-                            FILTERED_LEN_CD8 = CD8_DATA_FRAME[
-                                CD8_DATA_FRAME["EPI"].apply(len) == CD8_WINDOW_LENGTH].reset_index(drop=True)
-                            CD8_DATA_FRAME["VIRULENCE CHUNK"] = SINGLE_CHUNK_CD8
-                            CD8_EPITOPES.append(FILTERED_LEN_CD8)
+                        for CD4_WINDOW_LENGTHs in CD4_WINDOW_LENGTH:
+                            FASTA_CHUNKS_CD4 = [B_CELL_EPITOPE[i: j] for i in range(len(B_CELL_EPITOPE)) for j in
+                                                range(i + 1, len(B_CELL_EPITOPE) + 1) if
+                                                len(B_CELL_EPITOPE[i:j]) == CD4_WINDOW_LENGTHs]
 
-                        for SINGLE_CHUNK_CD4 in FASTA_CHUNKS_CD4:
-                            CD4_DATA_FRAME["ID"] = IDs_T_CELL
-                            CD4_DATA_FRAME["TYPE"] = "CD4"
-                            CD4_DATA_FRAME["ALLEL"] = CD4["ALLEL"]
-                            CD4_DATA_FRAME["EPI"] = CD4["FASTA"]
-                            FILTERED_LEN_CD4 = CD4_DATA_FRAME[
-                                CD4_DATA_FRAME["EPI"].apply(len) == CD4_WINDOW_LENGTH].reset_index(drop=True)
-                            CD4_DATA_FRAME["VIRULENCE CHUNK"] = SINGLE_CHUNK_CD4
-                            CD4_EPITOPES.append(FILTERED_LEN_CD4)
+                            for SINGLE_CHUNK_CD8 in FASTA_CHUNKS_CD8:
+                                CD8_DATA_FRAME["ID"] = IDs_T_CELL
+                                CD8_DATA_FRAME["TYPE"] = "CD8"
+                                CD8_DATA_FRAME["ALLEL"] = CD8["ALLEL"]
+                                CD8_DATA_FRAME["EPI"] = CD8["FASTA"]
+                                FILTERED_LEN_CD8 = CD8_DATA_FRAME[
+                                    CD8_DATA_FRAME["EPI"].apply(len) == CD8_WINDOW_LENGTHs].reset_index(drop=True)
+                                CD8_DATA_FRAME["VIRULENCE CHUNK"] = SINGLE_CHUNK_CD8
+                                CD8_DATA_FRAME["RESULT"] = CD8_DATA_FRAME.apply(
+                                    lambda x: compute_matched([x["EPI"], x["VIRULENCE CHUNK"]]), axis=1)
+                                CD8_RESULT = CD8_DATA_FRAME[CD8_DATA_FRAME["RESULT"] >= Epitope_identity_CD8_var.get()]
+                                CD8_EPITOPES.append(CD8_RESULT)
 
-                    EPITOPES_DATA_FRAME = pd.concat(ALL_EPITOPES_B_CELL).reset_index(drop=True)
-                    EPITOPES_DATA_FRAME["TYPE"] = "B CELL"
-                    EPITOPES_DATA_FRAME["RESULT"] = EPITOPES_DATA_FRAME.apply(
-                        lambda x: compute_matched([x["EPI"], x["VIRULENCE CHUNK"]]), axis=1)
+                            for SINGLE_CHUNK_CD4 in FASTA_CHUNKS_CD4:
+                                CD4_DATA_FRAME["ID"] = IDs_T_CELL
+                                CD4_DATA_FRAME["TYPE"] = "CD4"
+                                CD4_DATA_FRAME["ALLEL"] = CD4["ALLEL"]
+                                CD4_DATA_FRAME["EPI"] = CD4["FASTA"]
+                                FILTERED_LEN_CD4 = CD4_DATA_FRAME[
+                                    CD4_DATA_FRAME["EPI"].apply(len) == CD4_WINDOW_LENGTHs].reset_index(drop=True)
+                                CD4_DATA_FRAME["VIRULENCE CHUNK"] = SINGLE_CHUNK_CD4
+                                CD4_DATA_FRAME["RESULT"] = CD4_DATA_FRAME.apply(
+                                    lambda x: compute_matched([x["EPI"], x["VIRULENCE CHUNK"]]), axis=1)
+                                CD4_RESULT = CD4_DATA_FRAME[CD4_DATA_FRAME["RESULT"] >= Epitope_identity_CD4_var.get()]
+                                CD4_EPITOPES.append(CD4_RESULT)
 
                     CD8_EPITOPES_DATAFRAME = pd.concat(CD8_EPITOPES).reset_index(drop=True).dropna()
-                    CD8_EPITOPES_DATAFRAME["RESULT"] = CD8_EPITOPES_DATAFRAME.apply(
-                        lambda x: compute_matched([x["EPI"], x["VIRULENCE CHUNK"]]), axis=1)
-
                     CD4_EPITOPES_DATAFRAME = pd.concat(CD4_EPITOPES).reset_index(drop=True).dropna()
-                    CD4_EPITOPES_DATAFRAME["RESULT"] = CD4_EPITOPES_DATAFRAME.apply(
-                        lambda x: compute_matched([x["EPI"], x["VIRULENCE CHUNK"]]), axis=1)
 
-                    RESULT_CD8 = CD8_EPITOPES_DATAFRAME[CD8_EPITOPES_DATAFRAME["RESULT"] >= Epitope_identity_CD8_var.get()]
-                    RESULT_CD4 = CD4_EPITOPES_DATAFRAME[CD4_EPITOPES_DATAFRAME["RESULT"] >= Epitope_identity_CD4_var.get()]
+                    T_CELL_FILTERED = pd.concat([CD8_EPITOPES_DATAFRAME, CD4_EPITOPES_DATAFRAME])
 
-                    T_CELL_FILTERED = pd.concat([RESULT_CD8, RESULT_CD4])
-                    B_CELL_FILTERED = EPITOPES_DATA_FRAME[
-                        EPITOPES_DATA_FRAME["RESULT"] >= Epitope_identity_B_cell_var.get()].reset_index(
-                        drop=True)
+                    T_CELL_DATAFRAME = pd.DataFrame({
+                        "EPI": T_CELL_FILTERED["EPI"],
+                        "ID": T_CELL_FILTERED["ID"],
+                        "RESULT": T_CELL_FILTERED["RESULT"],
+                        "TYPE": T_CELL_FILTERED["TYPE"],
+                        "ALLEL": T_CELL_FILTERED["ALLEL"]
+                    }).drop_duplicates().reset_index(drop=True)
 
-                    with open(f"{SAVE_FILE_Var.get()}//T_EPITOPES.faa", "w") as faa_file_first:
+                    B_CELL_DATAFRAME = pd.DataFrame({
+                        "EPI": CONCAT_B_CELL["EPI"],
+                        "ID": CONCAT_B_CELL["ID"],
+                        "RESULT": CONCAT_B_CELL["RESULT"],
+                        "TYPE": CONCAT_B_CELL["TYPE"]
+                    }).drop_duplicates().reset_index(drop=True)
+
+                    with open(f"{SAVE_FILE_Var.get()}//T_EPITOPES_{len(T_CELL_DATAFRAME)}.faa", "w") as faa_file_first:
                         for FAA_PROTEIN, FAA_ID, FAA_PERC, FAA_NAME, FAA_TITLE in zip(
-                                T_CELL_FILTERED['EPI'],
-                                T_CELL_FILTERED['ID'],
-                                T_CELL_FILTERED['RESULT'],
-                                T_CELL_FILTERED['TYPE'],
-                                T_CELL_FILTERED["ALLEL"]):
+                                T_CELL_DATAFRAME['EPI'],
+                                T_CELL_DATAFRAME['ID'],
+                                T_CELL_DATAFRAME['RESULT'],
+                                T_CELL_DATAFRAME['TYPE'],
+                                T_CELL_DATAFRAME["ALLEL"]):
                             faa_file_first.write(
                                 f">{FAA_ID} {int(FAA_PERC)}% {FAA_NAME} {FAA_TITLE}" + "\n" + str(FAA_PROTEIN) + "\n")
                         faa_file_first.close()
 
-                    with open(f"{SAVE_FILE_Var.get()}//B_EPITOPES.faa", "w") as faa_file_second:
+                    with open(f"{SAVE_FILE_Var.get()}//B_EPITOPES_{len(B_CELL_DATAFRAME)}.faa", "w") as faa_file_second:
                         for FAA_PROTEIN, FAA_ID, FAA_PERC, FAA_NAME in zip(
-                                B_CELL_FILTERED['EPI'],
-                                B_CELL_FILTERED['ID'],
-                                B_CELL_FILTERED['RESULT'],
-                                B_CELL_FILTERED['TYPE']):
+                                B_CELL_DATAFRAME['EPI'],
+                                B_CELL_DATAFRAME['ID'],
+                                B_CELL_DATAFRAME['RESULT'],
+                                B_CELL_DATAFRAME['TYPE']):
                             faa_file_second.write(
                                 f">{FAA_ID} {int(FAA_PERC)}% {FAA_NAME} {FAA_TITLE}" + "\n" + str(FAA_PROTEIN) + "\n")
                         faa_file_second.close()
 
-                    TOTAL_EPI = len(T_CELL_FILTERED) + len(B_CELL_FILTERED)
+                    TOTAL_EPI = len(T_CELL_DATAFRAME) + len(B_CELL_DATAFRAME)
 
                     Epitope_peptides.config(text=f"{TOTAL_EPI}\nEpitope(s)", fg="Red")
                     sleep(2)
@@ -868,6 +983,7 @@ def FASTA_SUBMIT_BTN():
                     Localization_Proteins.config(text=f"0\nProtein(s)", fg=Label_Color)
                     Non_Homologs_Proteins.config(text=f"0\nProtein(s)", fg=Label_Color)
                     VFDB_Proteins.config(text=f"0\nProtein(s)", fg=Label_Color)
+                    PVCs.config(text=f"0\nPVC(s)", fg=Label_Color)
                     Epitope_peptides.config(text=f"0\nEpitope(s)", fg=Label_Color)
 
                     sleep(2)
@@ -912,8 +1028,8 @@ Localization = Checkbutton(Localization_Frame, variable=Localization_var,text="L
 Localization.deselect()
 Localization.place(relx=0.015, rely=0.38)
 
-Localization_Proteins = Label(Localization_Frame, text="0\nProtein(s)", bg=Second_Color, fg=Label_Color, font=(font_family, 13))
-Localization_Proteins.place(relx=0.86, rely=0.15)
+Localization_Proteins = Label(Localization_Frame, text="0\nProtein(s)", bg=Second_Color, fg=Label_Color, font=(font_family, 12))
+Localization_Proteins.place(relx=0.87, rely=0.15)
 
 Localization_file_name = StringVar()
 
@@ -1023,7 +1139,6 @@ def Localization_select(event):
     else:
         messagebox.showwarning("Warning","Select Strain")
 
-print(LOC_TREE_var.get())
 
 Localization_combo_box_1_var = StringVar()
 Localization_combo_box_1 = AutocompleteCombobox(Localization_Frame, completevalues=short, textvariable=Localization_combo_box_1_var)
@@ -1073,8 +1188,8 @@ Localization_Help.place(relx=0.1, rely=0.25)
 Non_Homologs_Frame = Frame(window, width=width_frames, height=70, bg=Second_Color, bd=0)
 Non_Homologs_Frame.grid(row=4, sticky="w")
 
-Non_Homologs_Proteins = Label(Non_Homologs_Frame, text="0\nProtein(s)", bg=Second_Color, fg=Label_Color, font=(font_family, 13))
-Non_Homologs_Proteins.place(relx=0.86, rely=0.15)
+Non_Homologs_Proteins = Label(Non_Homologs_Frame, text="0\nProtein(s)", bg=Second_Color, fg=Label_Color, font=(font_family, 12))
+Non_Homologs_Proteins.place(relx=0.87, rely=0.15)
 
 Non_Homologs_var = StringVar()
 Non_Homologs_check_btn = Checkbutton(Non_Homologs_Frame, variable=Non_Homologs_var,text="Non Host Homologs" ,onvalue="True", offvalue="False", bg=Second_Color, activebackground=Second_Color, font=(font_family, 11))
@@ -1104,8 +1219,11 @@ Non_Homologs_Help.place(relx=0.145, rely=0.25)
 VFDB_Frame = Frame(window, width=width_frames, height=70, bg=Second_Color, bd=0)
 VFDB_Frame.grid(row=5, sticky="w")
 
-VFDB_Proteins = Label(VFDB_Frame, text="0\nProtein(s)", bg=Second_Color, fg=Label_Color, font=(font_family, 13))
-VFDB_Proteins.place(relx=0.86, rely=0.15)
+PVCs = Label(VFDB_Frame, text="0\nPVC(s)", bg=Second_Color, fg=Label_Color, font=(font_family, 13))
+PVCs.place(relx=0.8, rely=0.15)
+
+VFDB_Proteins = Label(VFDB_Frame, text="0\nProtein(s)", bg=Second_Color, fg=Label_Color, font=(font_family, 12))
+VFDB_Proteins.place(relx=0.87, rely=0.15)
 
 VFDB_var = StringVar()
 VFDB_check_btn = Checkbutton(VFDB_Frame, variable=VFDB_var,text="Virulence Factors",onvalue="True", offvalue="False", bg=Second_Color, activebackground=Second_Color, font=(font_family, 11))
@@ -1128,8 +1246,8 @@ VFDB_Help.place(relx=0.133, rely=0.25)
 Epitope_Frame = Frame(window, width=width_frames, height=70, bg=Second_Color, bd=0)
 Epitope_Frame.grid(row=6, sticky="w")
 
-Epitope_peptides = Label(Epitope_Frame, text="0\nEpitope(s)", bg=Second_Color, fg=Label_Color, font=(font_family, 13))
-Epitope_peptides.place(relx=0.86, rely=0.15)
+Epitope_peptides = Label(Epitope_Frame, text="0\nEpitope(s)", bg=Second_Color, fg=Label_Color, font=(font_family, 12))
+Epitope_peptides.place(relx=0.87, rely=0.15)
 
 Epitope_var = StringVar()
 Epitope_check_btn = Checkbutton(Epitope_Frame, variable=Epitope_var,text="Epitope Mapping" , onvalue="True", offvalue="False", bg=Second_Color, activebackground=Second_Color, font=(font_family, 11))
@@ -1139,8 +1257,8 @@ Epitope_check_btn.place(relx=0.015, rely=0.4)
 Epitope_window_B_cell_Label = Label(Epitope_Frame, text="B Cell Length", bg=Second_Color, fg=Label_Color, font=(font_family, 10))
 Epitope_window_B_cell_Label.place(relx=0.18, rely=0.015)
 
-Epitope_window_B_cell_var = IntVar()
-Epitope_window_B_cell = ttk.Combobox(Epitope_Frame, width=10, values=[Epitope_window_B_cell_values for Epitope_window_B_cell_values in range(12,21)], textvariable=Epitope_window_B_cell_var)
+Epitope_window_B_cell_var = StringVar()
+Epitope_window_B_cell = ttk.Combobox(Epitope_Frame, width=10, values=[12, 13, 14, 15, 16, 17, 18, 19, 20, "ALL"], textvariable=Epitope_window_B_cell_var)
 Epitope_window_B_cell.place(relx=0.18, rely=0.4)
 
 Epitope_identity_Label_B_cell = Label(Epitope_Frame, text="B CELL Identity", bg=Second_Color, fg=Label_Color, font=(font_family, 10))
@@ -1153,8 +1271,8 @@ Epitope_identity_B_cell.place(relx=0.28, rely=0.4)
 Epitope_window_CD8_Label = Label(Epitope_Frame, text="CD8 Length", bg=Second_Color, fg=Label_Color, font=(font_family, 10))
 Epitope_window_CD8_Label.place(relx=0.38, rely=0.015)
 
-Epitope_window_CD8_var = IntVar()
-Epitope_window_CD8 = ttk.Combobox(Epitope_Frame, width=10, values=[Epitope_window_T_cell_values for Epitope_window_T_cell_values in range(8,14)], textvariable=Epitope_window_CD8_var)
+Epitope_window_CD8_var = StringVar()
+Epitope_window_CD8 = ttk.Combobox(Epitope_Frame, width=10, values=[8, 9, 10, 11, 12, 13, "ALL"], textvariable=Epitope_window_CD8_var)
 Epitope_window_CD8.place(relx=0.38, rely=0.4)
 
 Epitope_identity_Label_CD8 = Label(Epitope_Frame, text="CD8 Identity", bg=Second_Color, fg=Label_Color, font=(font_family, 10))
@@ -1167,8 +1285,8 @@ Epitope_identity_CD8.place(relx=0.48, rely=0.4)
 Epitope_window_CD4_Label = Label(Epitope_Frame, text="CD4 Length", bg=Second_Color, fg=Label_Color, font=(font_family, 10))
 Epitope_window_CD4_Label.place(relx=0.58, rely=0.015)
 
-Epitope_window_CD4_var = IntVar()
-Epitope_window_CD4 = ttk.Combobox(Epitope_Frame, width=10, values=[Epitope_window_T_cell_values for Epitope_window_T_cell_values in range(13,21)], textvariable=Epitope_window_CD4_var)
+Epitope_window_CD4_var = StringVar()
+Epitope_window_CD4 = ttk.Combobox(Epitope_Frame, width=10, values=[13, 14, 15, 16, 17, 18, 19, 20, "ALL"], textvariable=Epitope_window_CD4_var)
 Epitope_window_CD4.place(relx=0.58, rely=0.4)
 
 Epitope_identity_Label_CD4 = Label(Epitope_Frame, text="CD4 Identity", bg=Second_Color, fg=Label_Color, font=(font_family, 10))
@@ -1201,8 +1319,8 @@ Footer_Frame.grid(row=8, sticky="w")
 Footer_Frame_Label = Label(Footer_Frame, text="Integrative Biology Laboratory, Atta-ur-Rahman School of Applied Biosciences (ASAB)", bg=Buttons_Colors, fg=Second_Color, font=(font_family, 12))
 Footer_Frame_Label.place(relx=0.185, rely=0.05)
 
-Footer_Frame_Label_second = Label(Footer_Frame, text="1st floor, D Block, National University of Sciences and Technology (NUST), H-12 Islamabad.", bg=Buttons_Colors, fg=Second_Color, font=(font_family, 12))
-Footer_Frame_Label_second.place(relx=0.175, rely=0.43)
+Footer_Frame_Label_second = Label(Footer_Frame, text="National University of Sciences and Technology (NUST), Islamabad.", bg=Buttons_Colors, fg=Second_Color, font=(font_family, 12))
+Footer_Frame_Label_second.place(relx=0.25, rely=0.43)
 
 Localization_identity.set(60)
 Reliability.set(50)
